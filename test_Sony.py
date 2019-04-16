@@ -7,6 +7,7 @@ import tensorflow.contrib.slim as slim
 import numpy as np
 import rawpy
 import glob
+from PIL import Image
 
 input_dir = './dataset/Sony/short/'
 gt_dir = './dataset/Sony/long/'
@@ -21,6 +22,11 @@ DEBUG = 0
 if DEBUG == 1:
     save_freq = 2
     test_ids = test_ids[0:5]
+
+# test_ids = []
+# with open("./dataset/Sony_test_list.txt", "r") as f:
+#     for line in f.readlines():
+#         test_ids.append("./dataset/" + line.split(" ")[0])
 
 
 def lrelu(x):
@@ -98,7 +104,7 @@ def pack_raw(raw):
 
 sess = tf.Session()
 in_image = tf.placeholder(tf.float32, [None, None, None, 4])
-gt_image = tf.placeholder(tf.float32, [None, None, None, 3])
+# gt_image = tf.placeholder(tf.float32, [None, None, None, 3])
 out_image = network(in_image)
 
 saver = tf.train.Saver()
@@ -113,28 +119,29 @@ if not os.path.isdir(result_dir + 'final/'):
 
 for test_id in test_ids:
     # test the first image in each sequence
-    in_files = glob.glob(input_dir + '%05d_00*.ARW' % test_id)
+    in_files = glob.glob(input_dir + '%05d_00_0.04s.ARW' % test_id)
     for k in range(len(in_files)):
+        print("Running:", k)
         in_path = in_files[k]
         in_fn = os.path.basename(in_path)
         print(in_fn)
-        gt_files = glob.glob(gt_dir + '%05d_00*.ARW' % test_id)
-        gt_path = gt_files[0]
-        gt_fn = os.path.basename(gt_path)
-        in_exposure = float(in_fn[9:-5])
-        gt_exposure = float(gt_fn[9:-5])
-        ratio = min(gt_exposure / in_exposure, 300)
+        # gt_files = glob.glob(gt_dir + '%05d_00*.ARW' % test_id)
+        # gt_path = gt_files[0]
+        # gt_fn = os.path.basename(gt_path)
+        # in_exposure = float(in_fn[9:-5])
+        # gt_exposure = float(gt_fn[9:-5])
+        ratio = min((10 / 0.04), 300)
+        # ratio = min(gt_exposure / in_exposure, 300)
 
         raw = rawpy.imread(in_path)
         input_full = np.expand_dims(pack_raw(raw), axis=0) * ratio
 
         im = raw.postprocess(use_camera_wb=True, half_size=False, no_auto_bright=True, output_bps=16)
-        # scale_full = np.expand_dims(np.float32(im/65535.0),axis = 0)*ratio
-        scale_full = np.expand_dims(np.float32(im / 65535.0), axis=0)
+        # scale_full = np.expand_dims(np.float32(im / 65535.0), axis=0)
 
-        gt_raw = rawpy.imread(gt_path)
-        im = gt_raw.postprocess(use_camera_wb=True, half_size=False, no_auto_bright=True, output_bps=16)
-        gt_full = np.expand_dims(np.float32(im / 65535.0), axis=0)
+        # gt_raw = rawpy.imread(gt_path)
+        # im = gt_raw.postprocess(use_camera_wb=True, half_size=False, no_auto_bright=True, output_bps=16)
+        # gt_full = np.expand_dims(np.float32(im / 65535.0), axis=0)
 
         input_full = np.minimum(input_full, 1.0)
 
@@ -142,14 +149,15 @@ for test_id in test_ids:
         output = np.minimum(np.maximum(output, 0), 1)
 
         output = output[0, :, :, :]
-        gt_full = gt_full[0, :, :, :]
-        scale_full = scale_full[0, :, :, :]
-        scale_full = scale_full * np.mean(gt_full) / np.mean(
-            scale_full)  # scale the low-light image to the same mean of the groundtruth
+        # gt_full = gt_full[0, :, :, :]
+        # scale_full = scale_full[0, :, :, :]
+        # scale_full = scale_full * np.mean(gt_full) / np.mean(
+            # scale_full)  # scale the low-light image to the same mean of the groundtruth
 
-        scipy.misc.toimage(output * 255, high=255, low=0, cmin=0, cmax=255).save(
-            result_dir + 'final/%5d_00_%d_out.png' % (test_id, ratio))
-        scipy.misc.toimage(scale_full * 255, high=255, low=0, cmin=0, cmax=255).save(
-            result_dir + 'final/%5d_00_%d_scale.png' % (test_id, ratio))
-        scipy.misc.toimage(gt_full * 255, high=255, low=0, cmin=0, cmax=255).save(
-            result_dir + 'final/%5d_00_%d_gt.png' % (test_id, ratio))
+        Image.fromarray(np.uint8(output*255), mode=None).save(result_dir + 'final/%5d_00_%d_out.png' % (test_id, ratio))        
+        # scipy.misc.toimage(output * 255, high=255, low=0, cmin=0, cmax=255).save(
+            # result_dir + 'final/%5d_00_%d_out.png' % (test_id, ratio))
+        # scipy.misc.toimage(scale_full * 255, high=255, low=0, cmin=0, cmax=255).save(
+            # result_dir + 'final/%5d_00_%d_scale.png' % (test_id, ratio))
+        # scipy.misc.toimage(gt_full * 255, high=255, low=0, cmin=0, cmax=255).save(
+            # result_dir + 'final/%5d_00_%d_gt.png' % (test_id, ratio))
