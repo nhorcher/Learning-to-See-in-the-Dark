@@ -13,6 +13,7 @@ input_dir = './dataset/Sony/short/'
 gt_dir = './dataset/Sony/long/'
 checkpoint_dir = './checkpoint/Sony/'
 result_dir = './result_Sony/'
+tst_img = "nolight_person"
 
 # get test IDs
 test_fns = glob.glob(gt_dir + '/1*.ARW')
@@ -87,8 +88,13 @@ def network(input):
 
 def pack_raw(raw):
     # pack Bayer image to 4 channels
-    im = raw.raw_image_visible.astype(np.float32)
-    im = np.maximum(im - 512, 0) / (16383 - 512)  # subtract the black level
+    #im = raw.raw_image_visible.astype(np.float32)
+    im = Image.open("dataset/Sony/short/"+tst_img + ".jpg")
+    im = im.convert(mode="L")
+    im = np.asarray(im, dtype=np.float32)
+    bll = 2
+    #im = np.maximum(im - 512, 0) / (16383 - 512)  # subtract the black level
+    im = np.maximum(im - bll, 0) / (255 - bll)
 
     im = np.expand_dims(im, axis=2)
     img_shape = im.shape
@@ -117,6 +123,8 @@ if ckpt:
 if not os.path.isdir(result_dir + 'final/'):
     os.makedirs(result_dir + 'final/')
 
+tf.contrib.quantize.create_eval_graph()
+
 for test_id in test_ids:
     # test the first image in each sequence
     in_files = glob.glob(input_dir + '%05d_00_0.04s.ARW' % test_id)
@@ -133,10 +141,11 @@ for test_id in test_ids:
         ratio = min((10 / 0.04), 300)
         # ratio = min(gt_exposure / in_exposure, 300)
 
-        raw = rawpy.imread(in_path)
+        #raw = rawpy.imread(in_path)
+        raw = None
         input_full = np.expand_dims(pack_raw(raw), axis=0) * ratio
 
-        im = raw.postprocess(use_camera_wb=True, half_size=False, no_auto_bright=True, output_bps=16)
+        #im = raw.postprocess(use_camera_wb=True, half_size=False, no_auto_bright=True, output_bps=16)
         # scale_full = np.expand_dims(np.float32(im / 65535.0), axis=0)
 
         # gt_raw = rawpy.imread(gt_path)
@@ -154,7 +163,8 @@ for test_id in test_ids:
         # scale_full = scale_full * np.mean(gt_full) / np.mean(
             # scale_full)  # scale the low-light image to the same mean of the groundtruth
 
-        Image.fromarray(np.uint8(output*255), mode=None).save(result_dir + 'final/%5d_00_%d_out.png' % (test_id, ratio))        
+        Image.fromarray(np.uint8(output*255), mode=None).save(result_dir + tst_img + ".png")
+        #Image.fromarray(np.uint8(output*255), mode=None).save(result_dir + 'final/%5d_00_%d_out.png' % (test_id, ratio))        
         # scipy.misc.toimage(output * 255, high=255, low=0, cmin=0, cmax=255).save(
             # result_dir + 'final/%5d_00_%d_out.png' % (test_id, ratio))
         # scipy.misc.toimage(scale_full * 255, high=255, low=0, cmin=0, cmax=255).save(
